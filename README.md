@@ -23,7 +23,7 @@ Open `index.html` in a modern browser (Chrome, Safari, Firefox, Edge). Click any
 - Click-to-feed interaction
 - Live WebGL water ripple simulation, including the sakura shadow rippling across it
 - Text that gently makes way for each koi's trailing wake as it swims past
-- Responsive scaling that keeps the whole layout intact from small windows up to ultra-wide monitors
+- Responsive scaling that keeps the whole layout intact from ultra-wide monitors down to phone screens
 - Looping ambient audio with a mute toggle
 
 ## Stack

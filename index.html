@@ -155,6 +155,32 @@
   }
   .word-wrap { display: inline-block; white-space: nowrap; }
   .letter { display: inline-block; will-change: transform; }
+
+  /* ============== mobile: same three ponds, scaled down ==============
+     This breakpoint must match the MOBILE flag in the script (window.innerWidth
+     <= 760) and the 400x850 design size the JS mobile layout authors against —
+     #stage and the other stage layers need to actually BE that size for
+     layoutStage()'s fit-to-window scaling math to come out right. The lily-pad
+     overlays (#top1/#top2) get repositioned to match the scaled-down pond0/
+     pond2 art rects in PONDS below, rather than hidden — same three ponds,
+     same decoration, just smaller. */
+  @media (max-width: 760px) {
+    #stage, #shadowStage, #groundStage { width: 400px; height: 850px; }
+    #top1 { left: -25px; top: 246px; width: 140px; height: 340px; }
+    #top2 { left: 286px;  top: 330px; width: 140px; height: 340px; }
+    #en {
+      left: 20px; top: 20px; right: 20px; width: auto; height: 210px;
+      font-size: 13px; line-height: 1.7;
+    }
+    #ja {
+      left: 20px; right: 20px; top: 686px; bottom: auto;
+      width: auto; height: 145px;
+      font-size: 13px; line-height: 1.8; letter-spacing: 0.01em;
+    }
+    /* same uniform margin as the text and the stage itself, rather than
+       desktop's roomier 50px corner offset */
+    #audioToggle { left: 20px; bottom: 20px; }
+  }
 </style>
 </head>
 <body>
@@ -270,11 +296,22 @@
   // transparent canvas shows nothing no matter how strong the ripple is.
   // Covering more of the screen with faint texture is what makes ripples
   // readable in general, not just when crossing the kanji's edges.
-  // ================= the two pond rectangles =================
-  // The composition is authored in a fixed 1728x898 design space and
-  // scaled as one piece to fit the window, so every measurement below
-  // is in design units and converted through toScreen().
-  const DESIGN_W = 1728, DESIGN_H = 898;
+  // Below this width the piece switches to a single-column mobile
+  // layout entirely (see MOBILE branches throughout this file): one
+  // wide pond instead of three narrow ones, no tunnel between them,
+  // text stacked above and below the water instead of framing it.
+  // Decided once at load — the breakpoint must match the CSS media
+  // query that resizes #stage/#shadowStage/#groundStage to the same
+  // MOBILE_DESIGN_W/H below, since that CSS size is what the scaling
+  // math in layoutStage() is fitting to the window.
+  const MOBILE = window.innerWidth <= 760;
+  // ================= the pond rectangle(s) =================
+  // The composition is authored in a fixed design space and scaled as
+  // one piece to fit the window, so every measurement below is in
+  // design units and converted through toScreen(). Desktop authors at
+  // 1728x898; mobile at a narrower, taller 400x812 that matches the
+  // CSS override for #stage and friends.
+  const DESIGN_W = MOBILE ? 400 : 1728, DESIGN_H = MOBILE ? 850 : 898;
   // each pond: the crisp rectangle that masks the koi, and the overlay
   // artwork, which is that same rectangle plus the lily pads / grasses
   // / stones spilling out past one of its sides
@@ -283,7 +320,24 @@
   // artwork — lily pads, grasses, stones — which is painted over
   // everything afterwards and deliberately kept out of the water
   // simulation, so it sits on the surface rather than moving with it.
-  const PONDS = [
+  //
+  // Mobile keeps the same three-pond composition, staggered exactly
+  // like desktop, just scaled down (~0.575x) to fit a narrow portrait
+  // canvas, and re-centered under the English text band instead of
+  // sitting in the page's middle. Same gap/tunnel machinery, same
+  // "koi swim anywhere, not just in the ponds" behavior as desktop —
+  // nothing about the interactions changes, only where things sit.
+  const PONDS = MOBILE ? [
+    { rect: {x:35,  y:246, w:79,  h:340},
+      art:  {x:-25, y:246, w:140, h:340},
+      top:  {x:-25, y:246, w:140, h:340} },
+    { rect: {x:160, y:288, w:79,  h:340},
+      art:  {x:160, y:288, w:79,  h:340},
+      top:  null },
+    { rect: {x:286, y:330, w:79,  h:340},
+      art:  {x:286, y:330, w:140, h:340},
+      top:  {x:286, y:330, w:140, h:340} }
+  ] : [
     { rect: {x:577, y:80,  w:138, h:592},
       art:  {x:472, y:80,  w:243, h:592},
       top:  {x:472, y:77,  w:243, h:595} },
@@ -294,16 +348,25 @@
       art:  {x:1013, y:226, w:243, h:592},
       top:  {x:1013, y:226, w:243, h:614} }
   ];
-  // The two blocks of writing, in design units. The koi drift between
-  // them: each is drawn toward the column the other one just left, so
-  // they're forever crossing the middle in opposite directions.
-  const TEXT_ZONES = [
+  // The two blocks of writing, in design units. On desktop these are
+  // corner columns the koi drift between, each drawn toward whichever
+  // one the other fish just left. On mobile they're full-width bands,
+  // English above the pond cluster and Japanese below it — the koi
+  // still visit them the same way (see Koi#pickRoam, unchanged), just
+  // arriving at a horizontal band instead of a corner block.
+  const TEXT_ZONES = MOBILE ? [
+    { x: 20, y: 20,  w: 360, h: 210 },   // the English paragraphs, above the ponds
+    { x: 20, y: 686, w: 360, h: 145 }    // the vertical Japanese, below the ponds
+  ] : [
     { x: 45,   y: 75,  w: 350, h: 270 },   // the English paragraphs, top left
     { x: 1330, y: 600, w: 355, h: 225 }    // the vertical Japanese, bottom right
   ];
-  // the open water in the middle, where a koi can mill about between
-  // visits without being drawn to either column
-  const MIDDLE_ZONE = { x: 430, y: 65, w: 860, h: 770 };
+  // the open water where a koi can mill about without being drawn to
+  // either column — on desktop the gap between the three ponds; on
+  // mobile, a band loosely wrapping the (much smaller) pond cluster.
+  const MIDDLE_ZONE = MOBILE
+    ? { x: 15, y: 226, w: 370, h: 464 }
+    : { x: 430, y: 65, w: 860, h: 770 };
   // the wake's own sway: a slow, shallow wave, well below the frequency
   // of the swimming stroke
   // The wake is only about five pixels across, so a sway smaller than
@@ -312,13 +375,28 @@
   // thickness.
   const TRAIL_SWAY_AMP = 8.0;   // px at scale 1
   const TRAIL_SWAY_W   = 1.25;  // rad/s — a five-second wave
-  const WORLD_INSET = { x0: 40, y0: 55, x1: 1700, y1: 840 };
+  const WORLD_INSET = MOBILE
+    ? { x0: 10, y0: 15, x1: 390, y1: 840 }
+    : { x0: 40, y0: 55, x1: 1700, y1: 840 };
   // A koi drawn to a column doesn't aim only at the paragraph block
   // itself — it ranges over the whole corner of the page the writing
   // sits in, from the block out to the page's own edge, so its
   // destinations vary between right among the letters and out past
   // them toward the corner, rather than clustering tight to the text.
-  const EDGE_ZONES = [
+  //
+  // Mobile's text isn't in a corner though — it's a full-width band
+  // above and below the ponds — so instead of the desktop formula
+  // (which projects a zone out to WORLD_INSET's corner) these just
+  // hug the band itself, full width, with a little room to spill
+  // past its near edge.
+  const EDGE_ZONES = MOBILE ? [
+    { x: WORLD_INSET.x0, y: WORLD_INSET.y0,
+      w: WORLD_INSET.x1 - WORLD_INSET.x0,
+      h: TEXT_ZONES[0].y + TEXT_ZONES[0].h + 30 - WORLD_INSET.y0 },
+    { x: WORLD_INSET.x0, y: TEXT_ZONES[1].y - 30,
+      w: WORLD_INSET.x1 - WORLD_INSET.x0,
+      h: WORLD_INSET.y1 - (TEXT_ZONES[1].y - 30) }
+  ] : [
     { x: WORLD_INSET.x0, y: WORLD_INSET.y0,
       w: TEXT_ZONES[0].x + TEXT_ZONES[0].w + 80 - WORLD_INSET.x0,
       h: TEXT_ZONES[0].y + TEXT_ZONES[0].h + 80 - WORLD_INSET.y0 },
@@ -457,6 +535,10 @@
     ['clipR1','clipR2','clipR3'].forEach((id,i) => {
       const el = document.getElementById(id);
       if(!el) return;
+      // Guards against ever having fewer real ponds than clip rects —
+      // collapses any unused ones to zero-size rather than indexing into
+      // undefined, so they clip away to nothing instead of crashing.
+      if(!rs[i]){ el.setAttribute('width', 0); el.setAttribute('height', 0); return; }
       el.setAttribute('x', rs[i].x); el.setAttribute('y', rs[i].y);
       el.setAttribute('width', rs[i].w); el.setAttribute('height', rs[i].h);
     });
@@ -2434,8 +2516,10 @@ updateRouting(){
   // in between is exactly the part you don't get to watch.
   function fishWorld(){
     // the full page now, not just the water — this is what lets the koi
-    // drift over the Japanese and English columns and shoulder the
-    // letters aside on the way past
+    // drift over the Japanese and English columns (or, on mobile, the
+    // English/Japanese bands) and shoulder the letters aside on the way
+    // past. DESIGN_W/DESIGN_H are already mobile-aware, so this needs
+    // no separate branch.
     const a = toScreen({x:40, y:40, w:DESIGN_W-80, h:DESIGN_H-80});
     return { x0:a.x, y0:a.y, w:a.w, h:a.h };
   }
@@ -2446,21 +2530,51 @@ updateRouting(){
     // it — orange clears the Japanese column, blue clears the English
     // one — so the page always opens on the same composition of two
     // fish parting and crossing all the way past each other's text.
-    const a = toScreen({x:646, y:300, w:0, h:0});
-    const b = toScreen({x:1082, y:600, w:0, h:0});
+    // Mobile opens the same way, just inside the first/last of its three
+    // (much smaller) ponds instead of desktop's — same relative starting
+    // spot within each pond (see the proportions below, matched to
+    // desktop's own {646,300}/{1082,600} relative to its pond0/pond2).
+    const firstPond = PONDS[0].rect, lastPond = PONDS[PONDS.length - 1].rect;
+    const a = MOBILE
+      ? toScreen({x: firstPond.x + firstPond.w*0.5, y: firstPond.y + firstPond.h*0.37, w:0, h:0})
+      : toScreen({x:646, y:300, w:0, h:0});
+    const b = MOBILE
+      ? toScreen({x: lastPond.x + lastPond.w*0.5, y: lastPond.y + lastPond.h*0.63, w:0, h:0})
+      : toScreen({x:1082, y:600, w:0, h:0});
     // both koi at the same size — the orange one used to be rendered a
     // fifth larger, which read as a size difference between the two
-    // rather than as perspective
-    fishA = new Koi(a.x, a.y, 0.85*stageScale, 0, ORANGE_ASSET, -0.1);
-    fishB = new Koi(b.x, b.y, 0.85*stageScale, 2.1, BLUE_ASSET, Math.PI + 0.1);
+    // rather than as perspective. Smaller on mobile, in the same ratio
+    // the ponds themselves were scaled down, so the koi still fit them
+    // the way they fit the desktop ponds.
+    const KOI_SCALE = MOBILE ? 0.49 : 0.85;
+    fishA = new Koi(a.x, a.y, KOI_SCALE*stageScale, 0, ORANGE_ASSET, -0.1);
+    fishB = new Koi(b.x, b.y, KOI_SCALE*stageScale, 2.1, BLUE_ASSET, Math.PI + 0.1);
     const introNow = performance.now()/1000;
+    // The intro's own steering is fine tuned to be able to carry a koi
+    // right up to the world's edge (see the comment on avoidX/avoidY
+    // below — wall avoidance is deliberately held off during the intro
+    // so it doesn't fight this crossing), but position is still hard-
+    // clamped to fishWorld()'s bounds every frame regardless of intro
+    // state (the "hard backstop" clamp in steer()). A crossXDesign past
+    // that clamp is a threshold the koi can physically never reach — it
+    // just pins itself at the wall until the 40s introFallback finally
+    // frees it. fishWorld() insets by 40 design px on mobile's 400-wide
+    // canvas, i.e. it clamps to [40, 360]; the pond cluster's own edges
+    // (35 and 365) sit just outside that on both sides, so this keeps a
+    // 5px margin inside the clamp instead of using the pond edges raw.
+    const introEdgePad = 45;
     fishA.crossedText = false;
     fishA.crossSign = 1;                                  // must move rightward past it
-    fishA.crossXDesign = TEXT_ZONES[1].x + TEXT_ZONES[1].w; // far edge of the Japanese column
+    // The opening beat sweeps each koi once across the full swim space
+    // before roaming begins. Desktop phrases that as "past the far text
+    // column"; mobile's text bands don't have a meaningful x-extent to
+    // sweep past (they're full-width), so it sweeps past the far/near
+    // edge of the pond cluster instead — same beat, same effect.
+    fishA.crossXDesign = MOBILE ? Math.min(lastPond.x + lastPond.w, DESIGN_W - introEdgePad) : TEXT_ZONES[1].x + TEXT_ZONES[1].w;
     fishA.introFallback = introNow + 40;
     fishB.crossedText = false;
     fishB.crossSign = -1;                                 // must move leftward past it
-    fishB.crossXDesign = TEXT_ZONES[0].x;                  // near edge of the English column
+    fishB.crossXDesign = MOBILE ? Math.max(firstPond.x, introEdgePad) : TEXT_ZONES[0].x;
     fishB.introFallback = introNow + 40;
     // each sets off toward the column furthest from it, so their first
     // crossing takes them past each other in the middle
